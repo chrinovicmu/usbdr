@@ -37,6 +37,7 @@ struct usbdr_dev
     struct urb *bulk_in_urb; 
     struct urb *intr_in_urb; 
 
+    struct completion bulk_in_done; 
 
     /*buffer*/ 
     unsigned char *bulk_in_buffer;  /*allocated buffer for bulk IN data */ 
