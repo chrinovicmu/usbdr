@@ -1,0 +1,9 @@
+
+CompileFlags:
+  Add:
+    - -I/usr/src/linux-headers-$(uname -r)/include
+    - -I/usr/src/linux-headers-$(uname -r)/arch/x86/include
+    - -D__KERNEL__
+    - -D__KERNEL_STRICT_NAMES
+    - -nostdinc
+    - -isystem /usr/lib/clang/16/include

@@ -22,7 +22,6 @@ struct usbdr_dev
     __u8 device_subclass; 
     __u8 device_protocol; 
 
-
     struct usb_endpoint_descriptor *bulkin; /*bulk IN endpoint */ 
     struct usb_endpoint_descriptor *bulkout; /* bulk OUT endpoint */ 
     struct usb_endpoint_descriptor *num_intr_in; /*Interrupt IN endpoint */ 
@@ -35,14 +34,19 @@ struct usbdr_dev
 
     /*URB and complettion handling */ 
     struct urb *bulk_in_urb; 
+    struct urb *bulk_out_urb; 
     struct urb *intr_in_urb; 
 
     struct completion bulk_in_done; 
+    struct completion bulk_out_done; 
 
     /*buffer*/ 
     unsigned char *bulk_in_buffer;  /*allocated buffer for bulk IN data */ 
+    unsigned char *bulk_out_buffer; 
     unsigned char *intr_in_buffer; /*allocated buffer for bulk In endpoit */ 
+
     size_t bulk_in_size; 
+    size_t bulk_out_size; 
     size_t intr_in_size; 
 
     /*device state and synchronization */ 
