@@ -56,6 +56,7 @@ struct usbdr_dev
 
     /*wait queue for blocking reans on bulk IN */ 
     waited_queue_head_t bulk_in_wait; 
+    waited_queue_head_t bulk_out_wait; 
     waited_queue_head_t intr_in_wait; 
 
     bool ongoing_read;   

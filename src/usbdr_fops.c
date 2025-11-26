@@ -209,3 +209,14 @@ exit:
     return retval; 
 
 }
+
+const struct file_operations usbdr_fops = {
+    .owner = THIS_MODULE,
+    .open = usbdr_open, 
+    .release = usbdr_release, 
+    .read = usbdr_read, 
+    .write = usbdr_write, 
+    .llseek = no_llseek; 
+}; 
+
+
