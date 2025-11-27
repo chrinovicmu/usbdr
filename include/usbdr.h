@@ -24,7 +24,7 @@ struct usbdr_dev
 
     struct usb_endpoint_descriptor *bulkin; /*bulk IN endpoint */ 
     struct usb_endpoint_descriptor *bulkout; /* bulk OUT endpoint */ 
-    struct usb_endpoint_descriptor *num_intr_in; /*Interrupt IN endpoint */ 
+    struct usb_endpoint_descriptor *intr_in; /*Interrupt IN endpoint */ 
 
   
     /*endpoint addresses (cached for quik access in read/write) */ 
@@ -55,13 +55,13 @@ struct usbdr_dev
     struct mutex urb_mutex; 
 
     /*wait queue for blocking reans on bulk IN */ 
-    waited_queue_head_t bulk_in_wait; 
-    waited_queue_head_t bulk_out_wait; 
-    waited_queue_head_t intr_in_wait; 
+    wait_queue_head_t bulk_in_wait; 
+    wait_queue_head_t bulk_out_wait; 
+    wait_queue_head_t intr_in_wait; 
 
     bool ongoing_read;   
     bool disconnected; 
-
+ 
     /*chatacter device integration */ 
     struct device *dev; 
     struct cdev cdev;

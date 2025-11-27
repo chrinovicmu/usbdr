@@ -7,40 +7,76 @@
 extern struct usb_driver usbdr_driver; 
 
 
-/*call back function for Bulk IN transfer completion */ 
+/* Callback for Bulk IN transfer completion */
 static void usbdr_bulk_in_callback(struct urb *urb)
 {
     struct usbdr_dev *dev = urb->context;
 
-    /*status holds result of transfer */ 
+    mutex_lock(&dev->io_mutex);
+
     switch (urb->status) 
     {
-        case 0: /*success */ 
-            pr_info("Bulk IN URB completed succesffuly\n"); 
-            break; 
+        case 0: /* Success */
+            pr_info("Bulk IN URB completed successfully\n");
+            wake_up_interruptible(&dev->bulk_in_wait);
+            break;
 
-        case -EPIPE:
-            pr_err("Bulk IN URB stalled (endpoint halted), clearly halt\n"); 
-            usb_clear_halt(&dev->udev, usb_pipeendpoint(urb->pipe)); 
-            break; 
+        case -EPIPE: /* Endpoint stalled */
+            pr_err("Bulk IN URB stalled (endpoint halted)\n");
+            usb_clear_halt(dev->udev, usb_pipeendpoint(urb->pipe));
+            wake_up_interruptible(&dev->bulk_in_wait);
+            break;
+
+        case -ENOENT:       
+        case -ECONNRESET:   
+        case -ESHUTDOWN:
+            pr_err("Bulk IN URB canceled or device disconnected (status %d)\n", urb->status);
+            dev->disconnected = true;
+            wake_up_interruptible(&dev->bulk_in_wait);
+            break;
 
         default:
-            pr_err("Bulk IN URB with status: %d\n", urb->status);
-            break; 
+            pr_err("Bulk IN URB error, status: %d\n", urb->status);
+            wake_up_interruptible(&dev->bulk_in_wait);
+            break;
     }
-    /*signal that transfer is finished */ 
-    complete(&dev->bulk_in_done); 
+
+    mutex_unlock(&dev->io_mutex);
+    complete(&dev->bulk_in_done);
 }
 
-/*callback function for Bulk OUT transfer completion */ 
+/* Callback for Bulk OUT transfer completion */
 static void usbdr_bulk_out_callback(struct urb *urb)
 {
-    struct usbdr_dev *dev = urb->context; 
+    struct usbdr_dev *dev = urb->context;
 
-    if(urb->status)
-        pr_err("Bulk OUT URB failed with status: %d\n", urb->status); 
+    mutex_lock(&dev->io_mutex);
 
-    complete(&dev->bulk_out_done); 
+    if (urb->status != 0)
+        pr_err("Bulk OUT URB failed with status: %d\n", urb->status);
+
+    wake_up_interruptible(&dev->bulk_out_wait);
+
+    mutex_unlock(&dev->io_mutex);
+
+    complete(&dev->bulk_out_done);
+}
+
+/* Callback for Interrupt IN transfer completion */
+static void usbdr_intr_in_callback(struct urb *urb)
+{
+    struct usbdr_dev *dev = urb->context;
+
+    mutex_lock(&dev->io_mutex);
+
+    if (urb->status == 0) {
+        pr_info("Interrupt IN URB completed\n");
+        wake_up_interruptible(&dev->intr_in_wait);
+    } else {
+        pr_err("Interrupt IN URB error, status: %d\n", urb->status);
+    }
+
+    mutex_unlock(&dev->io_mutex);
 }
 
 static int usbdr_open(struct inode *inode, struct file *file)
