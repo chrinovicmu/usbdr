@@ -12,7 +12,7 @@
 
 
 /*max minor device numbers*/ 
-#define USBDR_MAC_DEVICES   16
+#define USBDR_MAX_DEVICES   16
 
 extern const struct file_operations usbdr_fops; 
 
@@ -103,7 +103,143 @@ static int usbdr_probe(struct usb_interface *intf, const struct usb_device_id *i
         goto err_free_all; 
     }
 
+    /*character device registration */ 
+    cdev_init(&dev->cdev, &usbdr_fops); 
+    dev->cdev.owner = THIS_MODULE; 
+
+    cdev_add(&dev->cdev, MKDEV(MAJOR(usbdr_devt), intf->minor), 1); 
+
+    /*node in sysfs and /dev */ 
+    dev->dev = device_create(usbdr_class,
+                             &intf->dev,
+                             MKDEV(MAJOR(usbdr_devt), intf->minor), 
+                             NULL, 
+                             "usbdr%d", intf->minor
+                             ); 
+
+    usb_set_intfdata(intf, dev); 
+
+    if(dev->intr_in_urb)
+        submit_intr_in_urb(dev); 
+
+    return 0; 
+
+err_free_all:
+    usb_put_dev(dev->udev);              
+    kfree(dev->bulk_in_buffer);         
+    kfree(dev->bulk_out_buffer);
+    kfree(dev->intr_in_buffer);
+    usb_free_urb(dev->bulk_in_urb);     
+    usb_free_urb(dev->bulk_out_urb);
+    usb_free_urb(dev->intr_in_urb);
+    kfree(dev)
+
+    return retval; 
+}
+
+
+static void usbdr_disconnect(struct usb_interface *intf)
+{
+    struct usbdr_dev *dev = usb_get_intfdata(intf); 
+    if(!dev)
+        return; 
+
+    dev->disconnected = true; 
+
+    /*kill outstanding URBs */ 
+
+    mutex_lock(&dev->io_mutex); 
+    
+    if(dev->bulk_in_urb)
+        usb_kill_urb(dev->bulk_in_urb); 
+    if(dev->bulk_out_urb)
+        usb_kill_urb(dev->bulk_out_urb);
+    if(dev->intr_in_urb)
+        usb_kill_urb(dev->intr_in_urb); 
+
+    mutex_unlock(&dev->io_mutex); 
+
+    device_detroy(usbdr_class, dev->cdev.dev);
+    cdev_del(&dev->cdev); 
+
+    usb_set_intfdata(intf, NULL); 
+    usb_put_dev(dev->udev); 
+
+    kfree(dev->bulk_in_buffer);
+    kfree(dev->bulk_out_buffer);
+    kfree(dev->intr_in_buffer);
+    usb_free_urb(dev->bulk_in_urb);
+    usb_free_urb(dev->bulk_out_urb);
+    usb_free_urb(dev->intr_in_urb);
+    kfree(dev); 
+
+    dev_info(&intf->dev, "USB device disconnected\n"); 
 
 }
 
+static const struct usb_device_id usbdr_table[] = {
+    {USB_DEVICE(USBDR_VENDOR_ID, USBDR_PRODUCT_ID) }, 
+    {}
+}; 
+
+MODULE_DEVICE_TABLE(usb, usbdr_table); 
+
+
+struct usb_driver usbdr_driver = {
+    .name = "usbdr", 
+    .id_table = usbdr_table, 
+    .probe = usbdr_probe, 
+    .disconnect = usbdr_disconnect, 
+    .supports_autosuspend = 1, 
+};
+
+static int __init usbdr_init(void)
+{
+    int ret; 
+
+    ret = alloc_chrdev_region(
+        &usbdr_dev,
+        0,
+        USBDR_MAX_DEVICES, 
+        "usbdr"); 
+
+    if(ret)
+        return ret; 
+
+    usbdr_class = class_create(THIS_MODULE, "usbdr"); 
+    if(IS_ERR(usbdr_class))
+    {
+        ret = PTR_ERR(usbdr_class); 
+        goto err_unreg; 
+    }
+
+    ret = usb_register(&usb_driver); 
+    if(ret)
+        goto err_class;
+
+    pr_info("usbdr: driver registered (major %d)\n", MAJOR(usbdr_devt)); 
+
+    return 0; 
+
+err_class:
+    class_destroy(usbdr_class); 
+err_unreg:
+    unregister_chrdev_region(usbdr_devt, USBDR_MAX_DEVICES); 
+    return ret; 
+}
+
+static void __exit usbdr_exit(void)
+{
+    usb_deregister(&usb_driver); 
+    class_destroy(usbdr_class); 
+    unregister_chrdev_region(usbdr_devt, USBDR_MAX_DEVICES); 
+    pr_info("usbdr: driver unloaded\n"); 
+}
+
+module_init(usbdr_init); 
+module_exit(usbdr_exit); 
+
+MODULE_AUTHOR("Chrinovic M");
+MODULE_DESCRIPTION("USB Driver");
+MODULE_LICENSE("GPL");  
 
