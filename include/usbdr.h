@@ -45,6 +45,11 @@ struct usbdr_dev
     unsigned char *bulk_out_buffer; 
     unsigned char *intr_in_buffer; /*allocated buffer for bulk In endpoit */ 
 
+    /*buffer DMA addresses */ 
+    dma_addr_t bulk_in_dma; 
+    dma_addr_t bulk_out_dma; 
+    dma_addr_t intr_in_dma; 
+
     size_t bulk_in_size; 
     size_t bulk_out_size; 
     size_t intr_in_size; 
