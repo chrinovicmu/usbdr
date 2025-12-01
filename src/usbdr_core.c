@@ -72,8 +72,15 @@ static int usbdr_probe(struct usb_interface *intf, const struct usb_device_id *i
             dev->bulk_in_pipe = usb_rcvbulkpipe(dev->udev, ep->bEndpointAddress); 
 
             /*allocate buffer */ 
-            dev->bulk_in_size = usb_endpoint_maxp(ep) * 8; 
-            dev->bulk_in_buffer = kmalloc(dev->bulk_in_size, GFP_KERNEL); 
+            dev->bulk_in_size = usb_endpoint_maxp(ep) * 8;
+
+            /*allocate DMA-coherent buffer */ 
+            dev->bulk_in_buffer = usb_alloc_coherent(
+                dev->udev, 
+                dev->bulk_in_size, 
+                GFP_KERNEL, 
+                &dev->bulk_in_dma); 
+
 
             dev->bulk_in_urb = usb_alloc_urb(0, GFP_KERNEL); 
         }
@@ -83,7 +90,13 @@ static int usbdr_probe(struct usb_interface *intf, const struct usb_device_id *i
             dev->bulkout = ep; 
             dev->bulk_out_pipe = usb_sndbulkpipe(dev->udev, ep->bEndpointAddress); 
             dev->bulk_out_size = usb_endpoint_maxp(ep) * 8; 
-            dev->bulk_out_buffer = kmalloc(dev->bulk_out_size, GFP_KERNEL); 
+
+            dev->bulk_out_buffer = usb_alloc_coherent(
+                dev->udev, 
+                dev->bulk_out_size, 
+                GFP_KERNEL,
+                &dev->bulk_out_dma); 
+
             dev->bulk_out_urb = usb_alloc_urb(0, GFP_KERNEL); 
         }
 
@@ -92,7 +105,13 @@ static int usbdr_probe(struct usb_interface *intf, const struct usb_device_id *i
             dev->intr_in = ep; 
             dev->intr_in_pipe = usb_rcvintpipe(dev->udev, ep->bEndpointAddress); 
             dev->intr_in_size = usb_endpoint_maxp(ep); 
-            dev->intr_in_buffer = kmalloc(dev->intr_in_size, GFP_KERNEL); 
+
+            dev->intr_in_buffer = usb_alloc_coherent(
+                dev->udev, 
+                dev->intr_in_size,
+                GFP_KERNEL, 
+                &dev->intr_in_dma);  
+
             dev->intr_in_urb = usb_alloc(0, GFP_KERNEL); 
         }
     }
