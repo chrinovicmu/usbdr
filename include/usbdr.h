@@ -11,14 +11,14 @@
 struct usbdr_dev
 {
     struct usb_device *udev;
-    struct usb_interface interface; 
+    struct usb_interface *interface; 
 
     unsigned char minor; 
 
     /*device descriptors */ 
     __u16 vendor_id;
     __u8 product_id; 
-    __u8 device class; 
+    __u8 device_class; 
     __u8 device_subclass; 
     __u8 device_protocol; 
 
@@ -44,6 +44,14 @@ struct usbdr_dev
     unsigned char *bulk_in_buffer;  /*allocated buffer for bulk IN data */ 
     unsigned char *bulk_out_buffer; 
     unsigned char *intr_in_buffer; /*allocated buffer for bulk In endpoit */ 
+
+    /*callaback functions for handling URB completions */ 
+    usb_complete_t bulk_in_callback; 
+    usb_complete_t bulk_out_callback; 
+    usb_complete_t intr_in_callback; 
+
+    /*polling interval for interrupt IN */ 
+    unsigned int intr_in_interval; 
 
     /*buffer DMA addresses */ 
     dma_addr_t bulk_in_dma; 
@@ -74,3 +82,8 @@ struct usbdr_dev
     void *private_data;
 }; 
 
+void usbdr_bulk_in_callback(struct urb *urb);
+void usbdr_bulk_out_callback(struct urb *urb); 
+void usbdr_intr_in_callback(struct urb *urb); 
+
+#endif 

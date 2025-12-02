@@ -1,16 +1,34 @@
+# Change directory to the kernel build directory
+KERNEL_DIR := /lib/modules/$(shell uname -r)/build
 
-# Kernel module Makefile
+# Module name
+MODULE_NAME := usbdr
 
-obj-m := usbdr.o
-usbdr-objs := src/usbdr_core.o src/usbdr_fops.o
+# Source files
+SRC_FILES := src/usbdr_core.c src/usbdr_fops.c
 
-# Path to kernel build directory
-KDIR := /lib/modules/$(shell uname -r)/build
+# Header directory
+INC_DIR := include
 
-# Default target: build the module
+# Set the include path
+ccflags-y := -I$(PWD)/$(INC_DIR)
+
+# Create the module object
+obj-m := $(MODULE_NAME).o
+$(MODULE_NAME)-y := $(SRC_FILES:.c=.o)
+
 all:
-	$(MAKE) -C $(KDIR) M=$(PWD) modules
+	$(MAKE) -C $(KERNEL_DIR) M=$(PWD) modules
 
-# Clean up
 clean:
-	$(MAKE) -C $(KDIR) M=$(PWD) clean
+	$(MAKE) -C $(KERNEL_DIR) M=$(PWD) clean
+	rm -f *.o *.ko *.mod.c *.mod.o modules.order Module.symvers
+	rm -f src/*.o
+
+install:
+	sudo insmod $(MODULE_NAME).ko
+
+uninstall:
+	sudo rmmod $(MODULE_NAME)
+
+reload: uninstall install

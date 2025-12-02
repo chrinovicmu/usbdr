@@ -8,7 +8,7 @@ extern struct usb_driver usbdr_driver;
 
 
 /* Callback for Bulk IN transfer completion */
-static void usbdr_bulk_in_callback(struct urb *urb)
+void usbdr_bulk_in_callback(struct urb *urb)
 {
     struct usbdr_dev *dev = urb->context;
 
@@ -46,7 +46,7 @@ static void usbdr_bulk_in_callback(struct urb *urb)
 }
 
 /* Callback for Bulk OUT transfer completion */
-static void usbdr_bulk_out_callback(struct urb *urb)
+void usbdr_bulk_out_callback(struct urb *urb)
 {
     struct usbdr_dev *dev = urb->context;
 
@@ -63,7 +63,7 @@ static void usbdr_bulk_out_callback(struct urb *urb)
 }
 
 /* Callback for Interrupt IN transfer completion */
-static void usbdr_intr_in_callback(struct urb *urb)
+void usbdr_intr_in_callback(struct urb *urb)
 {
     struct usbdr_dev *dev = urb->context;
 

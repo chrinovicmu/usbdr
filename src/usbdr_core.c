@@ -1,10 +1,10 @@
-#include <endian.h>
 #include <linux/kernel.h> 
 #include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/usb.h>
 #include <linux/device.h>
-#include <sys/types.h>
+#include <linux/types.h>
+#include <linux/byteorder/generic.h> 
 #include "usbdr.h"
 
 #define USBDR_VENDOR_ID     0x1234
@@ -22,6 +22,29 @@ static struct class *usbdr_class;
 
 struct usb_driver usbdr_driver; 
 
+static int submit_intr_in_urb(struct usbdr_dev *dev)
+{
+    int ret; 
+
+    if(!dev->intr_in_urb || !dev->intr_in_buffer)
+        return -EINVAL; 
+
+    usb_fill_int_urb(
+        dev->intr_in_urb,
+        dev->udev, 
+        dev->intr_in_pipe,
+        dev->intr_in_size,
+        dev->intr_in_callback, 
+        dev,
+        dev->intr_in_interval
+    ); 
+
+    ret = usb_submit_urb(dev->intr_in_urb, GFP_KERNEL); 
+    if(ret)
+        dev_err(&dev->interface->dev, "Failed to submit interrupt IN URB: %d\n", ret); 
+
+    return ret; 
+}
 
 static int usbdr_probe(struct usb_interface *intf, const struct usb_device_id *id)
 {
@@ -35,7 +58,7 @@ static int usbdr_probe(struct usb_interface *intf, const struct usb_device_id *i
 
     dev = kzalloc(sizeof(*dev), GFP_KERNEL); 
     if(!dev)
-        retuurn -ENOMEM;
+        return -ENOMEM;
 
     mutex_init(&dev->io_mutex); 
     mutex_init(&dev->urb_mutex); 
@@ -55,11 +78,11 @@ static int usbdr_probe(struct usb_interface *intf, const struct usb_device_id *i
     dev->vendor_id = le16_to_cpu(dev->udev->descriptor.idVendor); 
     dev->product_id = le16_to_cpu(dev->udev->descriptor.idProduct); 
     dev->device_class = dev->udev->descriptor.bDeviceClass;
-    dev->device_subclass = dev->udev->descriptor.bDeviceProtocol
+    dev->device_subclass = dev->udev->descriptor.bDeviceProtocol; 
 
     /*scan all endpoints in the interface descriptor */ 
 
-    for(i = 0; i < iface_desc->desc.bNumEndPoints; i++)
+    for(i = 0; i < iface_desc->desc.bNumEndpoints; i++)
     {
         /*ep points to endpoint descriptor of each endpoint */ 
         ep = iface_desc->endpoint[i].desc;
@@ -85,7 +108,7 @@ static int usbdr_probe(struct usb_interface *intf, const struct usb_device_id *i
             dev->bulk_in_urb = usb_alloc_urb(0, GFP_KERNEL); 
         }
 
-        if(!dev->bulkout && usb_enpoint_is_bulk_out(ep))
+        if(!dev->bulkout && usb_endpoint_is_bulk_out(ep))
         {
             dev->bulkout = ep; 
             dev->bulk_out_pipe = usb_sndbulkpipe(dev->udev, ep->bEndpointAddress); 
@@ -100,7 +123,7 @@ static int usbdr_probe(struct usb_interface *intf, const struct usb_device_id *i
             dev->bulk_out_urb = usb_alloc_urb(0, GFP_KERNEL); 
         }
 
-        if(!dev->intr_in && usb_enpoint_is_init_in(ep))
+        if(!dev->intr_in && usb_endpoint_is_int_in(ep))
         {
             dev->intr_in = ep; 
             dev->intr_in_pipe = usb_rcvintpipe(dev->udev, ep->bEndpointAddress); 
@@ -112,7 +135,7 @@ static int usbdr_probe(struct usb_interface *intf, const struct usb_device_id *i
                 GFP_KERNEL, 
                 &dev->intr_in_dma);  
 
-            dev->intr_in_urb = usb_alloc(0, GFP_KERNEL); 
+            dev->intr_in_urb = usb_alloc_urb(0, GFP_KERNEL); 
         }
     }
 
@@ -136,7 +159,7 @@ static int usbdr_probe(struct usb_interface *intf, const struct usb_device_id *i
                              "usbdr%d", intf->minor
                              ); 
 
-    usb_set_intfdata(intf, dev); 
+    usb_set_intfdata(intf, dev);
 
     if(dev->intr_in_urb)
         submit_intr_in_urb(dev); 
@@ -146,12 +169,12 @@ static int usbdr_probe(struct usb_interface *intf, const struct usb_device_id *i
 err_free_all:
     usb_put_dev(dev->udev);              
     kfree(dev->bulk_in_buffer);         
-    kfree(dev->bulk_out_buffer);
+kfree(dev->bulk_out_buffer);
     kfree(dev->intr_in_buffer);
     usb_free_urb(dev->bulk_in_urb);     
     usb_free_urb(dev->bulk_out_urb);
     usb_free_urb(dev->intr_in_urb);
-    kfree(dev)
+    kfree(dev); 
 
     return retval; 
 }
@@ -178,7 +201,7 @@ static void usbdr_disconnect(struct usb_interface *intf)
 
     mutex_unlock(&dev->io_mutex); 
 
-    device_detroy(usbdr_class, dev->cdev.dev);
+    device_destroy(usbdr_class, dev->cdev.dev);
     cdev_del(&dev->cdev); 
 
     usb_set_intfdata(intf, NULL); 
@@ -217,7 +240,7 @@ static int __init usbdr_init(void)
     int ret; 
 
     ret = alloc_chrdev_region(
-        &usbdr_dev,
+        &usbdr_devt,
         0,
         USBDR_MAX_DEVICES, 
         "usbdr"); 
@@ -232,7 +255,7 @@ static int __init usbdr_init(void)
         goto err_unreg; 
     }
 
-    ret = usb_register(&usb_driver); 
+    ret = usb_register(&usbdr_driver); 
     if(ret)
         goto err_class;
 
@@ -249,7 +272,7 @@ err_unreg:
 
 static void __exit usbdr_exit(void)
 {
-    usb_deregister(&usb_driver); 
+    usb_deregister(&usbdr_driver); 
     class_destroy(usbdr_class); 
     unregister_chrdev_region(usbdr_devt, USBDR_MAX_DEVICES); 
     pr_info("usbdr: driver unloaded\n"); 
