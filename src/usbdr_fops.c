@@ -1,8 +1,7 @@
-#include <cerrno>
 #include <linux/module.h>
 #include <linux/uaccess.h>
 #include <linux/usb.h>
-#include "usbr.h"
+#include "usbdr.h"
 
 extern struct usb_driver usbdr_driver; 
 
@@ -141,7 +140,7 @@ static ssize_t usbdr_read(struct file *file, char __user *buf, size_t count, lof
 
     dev->bulk_in_urb->transfer_flags |= URB_NO_TRANSFER_DMA_MAP; 
 
-    retval = usb_submit_urb(dev->urb, GFP_KERNEL); 
+    retval = usb_submit_urb(dev->bulk_in_urb, GFP_KERNEL); 
     if(retval)
     {
         pr_info("usb_fops: urb submisson failed!\n"); 
@@ -213,7 +212,7 @@ static ssize_t usbdr_write(struct file *file, const char __user *buf, size_t cou
 
     reinit_completion(&dev->bulk_out_done); 
 
-    usb_fill_urb(dev->bulk_out_urb, 
+    usb_fill_bulk_urb(dev->bulk_out_urb, 
                  dev->udev, 
                  dev->bulk_out_pipe, 
                  kbuf, 
@@ -221,26 +220,26 @@ static ssize_t usbdr_write(struct file *file, const char __user *buf, size_t cou
                  usbdr_bulk_out_callback, 
                  dev); 
 
-    dev->bulk_out_pipe->transfer_flags |= URB_NO_TRANSFER_DMA_MAP; 
+    dev->bulk_out_urb->transfer_flags |= URB_NO_TRANSFER_DMA_MAP; 
 
-    retval = usb_submit_urb(&dev->bulk_out_urb, GFP_KERNEL); 
+    retval = usb_submit_urb(dev->bulk_out_urb, GFP_KERNEL); 
     if(retval)
     {
         pr_info("usbdr_write: usb_submit_urb failed: %d\n", retval); 
-        gotto _exit; 
+        goto _exit; 
     }
 
     retval = wait_for_completion_interruptible(&dev->bulk_out_done);
     if(retval)
     {
         pr_err("usbdr_write: wait_for_completion_interruptible interrupted, killing URB\n"); 
-        usb_kill_urb(&dev->bulk_out_urb); 
+        usb_kill_urb(dev->bulk_out_urb); 
         goto _exit; 
     }
 
     retval = dev->bulk_out_urb->actual_length ? dev->bulk_out_urb->actual_length : count; 
 
-exit:
+_exit:
     mutex_unlock(&dev->io_mutex); 
     return retval; 
 
@@ -252,7 +251,7 @@ const struct file_operations usbdr_fops = {
     .release = usbdr_release, 
     .read = usbdr_read, 
     .write = usbdr_write, 
-    .llseek = no_llseek; 
+    .llseek = no_llseek,
 }; 
 
 

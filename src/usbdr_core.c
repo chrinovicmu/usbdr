@@ -33,6 +33,7 @@ static int submit_intr_in_urb(struct usbdr_dev *dev)
         dev->intr_in_urb,
         dev->udev, 
         dev->intr_in_pipe,
+        dev->intr_in_buffer, 
         dev->intr_in_size,
         dev->intr_in_callback, 
         dev,
@@ -85,7 +86,7 @@ static int usbdr_probe(struct usb_interface *intf, const struct usb_device_id *i
     for(i = 0; i < iface_desc->desc.bNumEndpoints; i++)
     {
         /*ep points to endpoint descriptor of each endpoint */ 
-        ep = iface_desc->endpoint[i].desc;
+        ep = &iface_desc->endpoint[i].desc;
 
         if(!dev->bulkin && usb_endpoint_is_bulk_in(ep))
         {

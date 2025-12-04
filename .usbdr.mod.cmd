@@ -1,1 +1,0 @@
-cmd_/home/chrinovic/Workspace/Projects/usbdr/usbdr.mod := printf '%s\n'   src/usbdr_core.o src/usbdr_fops.o | awk '!x[$$0]++ { print("/home/chrinovic/Workspace/Projects/usbdr/"$$0) }' > /home/chrinovic/Workspace/Projects/usbdr/usbdr.mod
